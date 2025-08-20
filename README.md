@@ -6,7 +6,7 @@
 
 - 提供链接转写方法`ConvertUrl(string url)`.url必须具备scheme,比如http/https。
 
-- 公开了属性`IsVpnEnabled`;`httpClient`;`Logined`;`TWFID`;`AutoDirect`,TWFID是鉴权的必要Cookie.公开了CancellationtokenSource `Cancellation`,提供一个默认的取消令牌源。如果想要自定义复杂取消方式，请修改源代码。
+- 公开了属性`IsVpnEnabled`;`client`;`Logined`;`TWFID`;`AutoDirect`,TWFID是鉴权的必要Cookie.当没有登录成功是，TWFID返回空Cookie对象。
 
 - 重写了Http请求的发送方法，比如Send/Get/Post/Put/Delete/GetBytesArray.当`IsVpnEnabled`为true且Logined为true时，请求均使用web vpn发送，同时自动改写Url。如果Logined为False,则报错弹出。登录失败返回“400：{错误信息}”。
 
