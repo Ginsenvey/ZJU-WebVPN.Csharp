@@ -1,6 +1,4 @@
-﻿using HtmlAgilityPack;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
+using HtmlAgilityPack;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -24,7 +22,6 @@ public class VpnService : IDisposable
     private bool _disposed = false;
     public bool Logined = false;
     public bool AutoDirect = true;
-    public CancellationTokenSource Cancellation { get; } = new();
     public Cookie TWFID => Jar.GetCookies(new Uri("https://webvpn.zju.edu.cn"))["TWFID"]??new Cookie();
 
     public VpnService()
@@ -45,9 +42,9 @@ public class VpnService : IDisposable
         client.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36 Edg/138.0.0.0");
     }
 
-    public async Task<string> LoginAsync(string username, string password)
+    public async Task<string> LoginAsync(string username, string password,CancellationToken cts=default)
     {
-        var authResponse = await client.GetAsync(LoginAuthUrl, Cancellation.Token);
+        var authResponse = await client.GetAsync(LoginAuthUrl);
         authResponse.EnsureSuccessStatusCode();
         var authXml = await authResponse.Content.ReadAsStringAsync();
         var (csrfRandCode, encryptKey, encryptExp) = ParseAuthXml(authXml);
@@ -62,7 +59,7 @@ public class VpnService : IDisposable
         };
 
         var content = new FormUrlEncodedContent(formData);
-        var loginResponse = await client.PostAsync(LoginPswUrl, content,Cancellation.Token);
+        var loginResponse = await client.PostAsync(LoginPswUrl, content);
         var loginXml = await loginResponse.Content.ReadAsStringAsync();
         if (VerifyLoginResult(loginXml) == "1")
         {
@@ -129,13 +126,13 @@ public class VpnService : IDisposable
            
         
     }
-    public async Task<string> CheckNetwork(bool UseVpn)
+    public async Task<string> CheckNetwork(bool UseVpn,CancellationToken cts=default)
     {
         string Mirror_Url =  "https://mirrors.zju.edu.cn/api/is_campus_network";
         string target_uri = UseVpn ? ConvertUrl(Mirror_Url) : Mirror_Url;
         try
         {
-            var response = await client.GetAsync(Mirror_Url, Cancellation.Token);
+            var response = await client.GetAsync(Mirror_Url);
             if (response.IsSuccessStatusCode)
             {
                 string res_text = await response.Content.ReadAsStringAsync();
@@ -164,7 +161,7 @@ public class VpnService : IDisposable
         
 
     }
-    public async Task<byte[]> GetByteArrayAsync(string url)
+    public async Task<byte[]> GetByteArrayAsync(string url, CancellationToken cts = default)
     {
         if (!Logined)
             throw new InvalidOperationException("Not logged in");
@@ -172,7 +169,7 @@ public class VpnService : IDisposable
         string targetUrl = IsVpnEnabled ? ConvertUrl(url) : url;
         try
         {
-            var response = await client.GetAsync(targetUrl, Cancellation.Token);
+            var response = await client.GetAsync(targetUrl);
             if (response.IsSuccessStatusCode)
             {
                 return await response.Content.ReadAsByteArrayAsync();
@@ -182,32 +179,32 @@ public class VpnService : IDisposable
         return null;
         
     }
-    public async Task<HttpResponseMessage> GetAsync(string url, bool webvpn = false)
+    public async Task<HttpResponseMessage> GetAsync(string url, bool webvpn = false,CancellationToken cts=default)
     {
         return await SendRequestAsync(HttpMethod.Get, url, null);
     }
 
-    public async Task<HttpResponseMessage> PostAsync(string url, HttpContent content)
+    public async Task<HttpResponseMessage> PostAsync(string url, HttpContent content,CancellationToken cts=default)
     {
         return await SendRequestAsync(HttpMethod.Post, url,content);
     }
-    public async Task<HttpResponseMessage> SendAsync(string url, HttpRequestMessage request)
+    public async Task<HttpResponseMessage> SendAsync(string url, HttpRequestMessage request, CancellationToken cts = default)
     {
         if (!Logined && IsVpnEnabled)
             throw new Exception("WebVPN未连接");
         string targetUrl = IsVpnEnabled ? ConvertUrl(url) : url;
         request.RequestUri = new Uri(targetUrl);
-        return await client.SendAsync(request, Cancellation.Token);
+        return await client.SendAsync(request);
     }
-    public async Task<HttpResponseMessage> DeleteAsync(string url)
+    public async Task<HttpResponseMessage> DeleteAsync(string url, CancellationToken cts = default)
     {
         if (!Logined && IsVpnEnabled)
             throw new Exception("WebVPN未连接");
         string targetUrl = IsVpnEnabled ? ConvertUrl(url) : url;
         using var request = new HttpRequestMessage(HttpMethod.Delete,targetUrl);
-        return await client.SendAsync(request, Cancellation.Token);
+        return await client.SendAsync(request);
     }
-    public async Task<HttpResponseMessage> PutAsync(string url,StringContent content )
+    public async Task<HttpResponseMessage> PutAsync(string url,StringContent content , CancellationToken cts = default)
     {
         if (!Logined && IsVpnEnabled)
             throw new Exception("WebVPN未连接");
@@ -215,7 +212,7 @@ public class VpnService : IDisposable
 
         using var request = new HttpRequestMessage(HttpMethod.Put, targetUrl);
         request.Content = content;
-        return await client.SendAsync(request, Cancellation.Token);
+        return await client.SendAsync(request);
     }
     private async Task<HttpResponseMessage> SendRequestAsync(HttpMethod method, string url,
         HttpContent content)
@@ -232,13 +229,13 @@ public class VpnService : IDisposable
             request.Content = content;
         }
 
-        var response = await client.SendAsync(request, Cancellation.Token);
+        var response = await client.SendAsync(request);
 
 
         return response;
     }
 
-    public static string ConvertUrl(string originalUrl)
+    public static string ConvertUrl(string originalUrl, CancellationToken cts = default)
     {
         var uri = new Uri(originalUrl);
         string hostname = uri.Host.Replace('.', '-');
